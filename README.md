@@ -45,6 +45,7 @@ DOMAIN=example.com PANEL_PATH=SECRET_PATH BLOCK_ICMP_PING=true DISABLE_IPV6=true
 - Ставит Caddy из стандартного репозитория Debian/Ubuntu.
 - Скачивает latest release `MHSanaei/3x-ui` и устанавливает systemd service без Docker.
 - Генерирует admin-логин, пароль, Reality private/public key, short id и UUID клиента.
+- Генерирует `subId` для первого клиента и печатает ссылку подписки.
 - Настраивает 3x-ui panel на `127.0.0.1:2053` и base path `PANEL_PATH`.
 - Создает VLESS TCP REALITY inbound на `443` с self-steal `dest=127.0.0.1:4123`.
 - Создает Caddyfile: сайт-заглушка на домене и reverse proxy панели на `8443`.
@@ -52,7 +53,7 @@ DOMAIN=example.com PANEL_PATH=SECRET_PATH BLOCK_ICMP_PING=true DISABLE_IPV6=true
 - Включает BBR.
 - Спрашивает, блокировать ли ICMP ping до сервера. По умолчанию `Y`.
 - Спрашивает, отключать ли IPv6. По умолчанию `Y`.
-- Печатает итоговый URL панели, логин/пароль и VLESS ссылку.
+- Печатает итоговый URL панели, логин/пароль, VLESS ссылку и ссылку подписки.
 
 ## Переменные
 

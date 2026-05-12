@@ -432,6 +432,7 @@ generate_reality_keys() {
   REALITY_PUBLIC_KEY="$(awk -F': ' '/Password \(PublicKey\):/ {print $2} /PublicKey:/ {print $2} /Public key:/ {print $2}' <<<"${output}")"
   [[ -n "${REALITY_PRIVATE_KEY}" && -n "${REALITY_PUBLIC_KEY}" ]] || die "Could not generate Reality keys."
   CLIENT_UUID="$("${xray_bin}" uuid)"
+  CLIENT_SUB_ID="$(openssl rand -hex 8)"
   SHORT_ID="$(openssl rand -hex 8)"
 }
 
@@ -442,7 +443,7 @@ configure_reality_inbound() {
   generate_reality_keys
 
   local settings stream sniffing http_code
-  settings="$(jq -cn --arg uuid "${CLIENT_UUID}" '{
+  settings="$(jq -cn --arg uuid "${CLIENT_UUID}" --arg subId "${CLIENT_SUB_ID}" '{
     clients: [{
       id: $uuid,
       flow: "xtls-rprx-vision",
@@ -452,7 +453,7 @@ configure_reality_inbound() {
       expiryTime: 0,
       enable: true,
       tgId: "",
-      subId: ""
+      subId: $subId
     }],
     decryption: "none",
     fallbacks: []
@@ -576,8 +577,9 @@ configure_firewall() {
 }
 
 write_result() {
-  local vless_link
+  local vless_link sub_link
   vless_link="vless://${CLIENT_UUID}@${DOMAIN}:${REALITY_PORT}?type=tcp&security=reality&pbk=${REALITY_PUBLIC_KEY}&fp=chrome&sni=${DOMAIN}&sid=${SHORT_ID}&spx=%2F&flow=xtls-rprx-vision#${DOMAIN}-selfsteal"
+  sub_link="https://${DOMAIN}:${PANEL_PUBLIC_PORT}/sub/${CLIENT_SUB_ID}"
   cat >"${STATE_FILE}" <<EOF
 DOMAIN=${DOMAIN}
 PANEL_URL=https://${DOMAIN}:${PANEL_PUBLIC_PORT}/${PANEL_PATH}/
@@ -586,10 +588,12 @@ PANEL_PASSWORD=${XUI_PASSWORD}
 REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
 REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
 CLIENT_UUID=${CLIENT_UUID}
+CLIENT_SUB_ID=${CLIENT_SUB_ID}
 SHORT_ID=${SHORT_ID}
 BLOCK_ICMP_PING=${BLOCK_ICMP_PING}
 DISABLE_IPV6=${DISABLE_IPV6}
 VLESS_LINK=${vless_link}
+SUB_LINK=${sub_link}
 EOF
   chmod 600 "${STATE_FILE}"
 
@@ -600,6 +604,7 @@ EOF
   echo "User:      ${XUI_USER}"
   echo "Password:  ${XUI_PASSWORD}"
   echo "VLESS:     ${vless_link}"
+  echo "Sub:       ${sub_link}"
   echo
   echo "Saved to ${STATE_FILE}"
 }
