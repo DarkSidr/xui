@@ -10,6 +10,7 @@ STATE_FILE="${APP_DIR}/install-result.env"
 DOMAIN="${DOMAIN:-}"
 PANEL_PATH="${PANEL_PATH:-}"
 PANEL_PORT="${PANEL_PORT:-2053}"
+PANEL_PUBLIC_PORT="${PANEL_PUBLIC_PORT:-8443}"
 CADDY_STEAL_PORT="${CADDY_STEAL_PORT:-4123}"
 REALITY_PORT="${REALITY_PORT:-443}"
 SSH_PORT="${SSH_PORT:-22}"
@@ -298,6 +299,10 @@ write_caddyfile() {
     servers 127.0.0.1:${CADDY_STEAL_PORT} {
         protocols h1 h2
     }
+
+    servers 0.0.0.0:${PANEL_PUBLIC_PORT} {
+        protocols h1 h2
+    }
 }
 
 http://${DOMAIN} {
@@ -310,6 +315,22 @@ https://${DOMAIN} {
     root * ${WWW_DIR}
     encode gzip zstd
 
+    handle {
+        file_server
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
+https://${DOMAIN}:${PANEL_PUBLIC_PORT} {
+    bind 0.0.0.0
+    encode gzip zstd
+
     redir /${PANEL_PATH} /${PANEL_PATH}/ permanent
 
     handle /${PANEL_PATH}* {
@@ -320,8 +341,12 @@ https://${DOMAIN} {
         }
     }
 
-    handle {
-        file_server
+    handle /sub* {
+        reverse_proxy 127.0.0.1:2096 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto https
+        }
     }
 
     header {
@@ -541,6 +566,7 @@ configure_firewall() {
   iptables -A INPUT -p tcp --dport "${SSH_PORT}" -j ACCEPT
   iptables -A INPUT -p tcp --dport 80 -j ACCEPT
   iptables -A INPUT -p tcp --dport "${REALITY_PORT}" -j ACCEPT
+  iptables -A INPUT -p tcp --dport "${PANEL_PUBLIC_PORT}" -j ACCEPT
   iptables -P INPUT DROP
   iptables -P FORWARD DROP
   iptables -P OUTPUT ACCEPT
@@ -553,7 +579,7 @@ write_result() {
   vless_link="vless://${CLIENT_UUID}@${DOMAIN}:${REALITY_PORT}?type=tcp&security=reality&pbk=${REALITY_PUBLIC_KEY}&fp=chrome&sni=${DOMAIN}&sid=${SHORT_ID}&spx=%2F&flow=xtls-rprx-vision#${DOMAIN}-selfsteal"
   cat >"${STATE_FILE}" <<EOF
 DOMAIN=${DOMAIN}
-PANEL_URL=https://${DOMAIN}/${PANEL_PATH}/
+PANEL_URL=https://${DOMAIN}:${PANEL_PUBLIC_PORT}/${PANEL_PATH}/
 PANEL_USER=${XUI_USER}
 PANEL_PASSWORD=${XUI_PASSWORD}
 REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
@@ -569,7 +595,7 @@ EOF
   echo
   echo -e "${green}Installation complete${plain}"
   echo "Site:      https://${DOMAIN}/"
-  echo "Panel:     https://${DOMAIN}/${PANEL_PATH}/"
+  echo "Panel:     https://${DOMAIN}:${PANEL_PUBLIC_PORT}/${PANEL_PATH}/"
   echo "User:      ${XUI_USER}"
   echo "Password:  ${XUI_PASSWORD}"
   echo "VLESS:     ${vless_link}"
