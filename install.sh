@@ -342,16 +342,28 @@ api_base_candidates() {
 }
 
 login_panel() {
-  local base http_code
-  COOKIE_FILE="$(mktemp)"
+  local base http_code csrf_token
   for base in $(api_base_candidates); do
+    COOKIE_FILE="$(mktemp)"
+    csrf_token="$(curl -sS \
+      -c "${COOKIE_FILE}" \
+      -b "${COOKIE_FILE}" \
+      -H "X-Requested-With: XMLHttpRequest" \
+      "${base}/csrf-token" | jq -r 'select(.success == true) | .obj // empty' 2>/dev/null || true)"
+    [[ -n "${csrf_token}" ]] || continue
+
     http_code="$(curl -sS -o /tmp/xui-login.json -w "%{http_code}" \
       -c "${COOKIE_FILE}" \
-      -H "Content-Type: application/json" \
-      -d "{\"username\":\"${XUI_USER}\",\"password\":\"${XUI_PASSWORD}\"}" \
+      -b "${COOKIE_FILE}" \
+      -H "X-Requested-With: XMLHttpRequest" \
+      -H "X-CSRF-Token: ${csrf_token}" \
+      -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" \
+      --data-urlencode "username=${XUI_USER}" \
+      --data-urlencode "password=${XUI_PASSWORD}" \
       "${base}/login" || true)"
     if [[ "${http_code}" == "200" ]] && jq -e '.success == true' /tmp/xui-login.json >/dev/null 2>&1; then
       XUI_API_BASE="${base}"
+      XUI_CSRF_TOKEN="${csrf_token}"
       return 0
     fi
   done
@@ -426,6 +438,8 @@ configure_reality_inbound() {
 
   http_code="$(curl -sS -o /tmp/xui-add-inbound.json -w "%{http_code}" \
     -b "${COOKIE_FILE}" \
+    -H "X-Requested-With: XMLHttpRequest" \
+    -H "X-CSRF-Token: ${XUI_CSRF_TOKEN}" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     --data-urlencode "up=0" \
     --data-urlencode "down=0" \
