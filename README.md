@@ -18,16 +18,22 @@ https://example.com/SECRET_PATH   -> 3x-ui panel
 
 ## Быстрый запуск
 
-После публикации репозитория на GitHub команда будет такой:
+Интерактивный запуск:
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/DarkSidr/xui/main/install.sh)
 ```
 
 Или с параметрами без интерактива:
 
 ```bash
-DOMAIN=example.com PANEL_PATH=SECRET_PATH bash <(wget -qO- https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/install.sh)
+DOMAIN=example.com PANEL_PATH=SECRET_PATH bash <(wget -qO- https://raw.githubusercontent.com/DarkSidr/xui/main/install.sh)
+```
+
+Полностью без вопросов:
+
+```bash
+DOMAIN=example.com PANEL_PATH=SECRET_PATH BLOCK_ICMP_PING=true DISABLE_IPV6=true bash <(wget -qO- https://raw.githubusercontent.com/DarkSidr/xui/main/install.sh)
 ```
 
 ## Что делает скрипт
