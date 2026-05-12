@@ -459,7 +459,7 @@ configure_reality_inbound() {
   }')"
   stream="$(jq -cn \
     --arg domain "${DOMAIN}" \
-    --arg dest "127.0.0.1:${CADDY_STEAL_PORT}" \
+    --arg target "127.0.0.1:${CADDY_STEAL_PORT}" \
     --arg privateKey "${REALITY_PRIVATE_KEY}" \
     --arg shortId "${SHORT_ID}" \
     '{
@@ -472,12 +472,13 @@ configure_reality_inbound() {
       realitySettings: {
         show: false,
         xver: 0,
-        dest: $dest,
+        target: $target,
+        dest: $target,
         serverNames: [$domain],
         privateKey: $privateKey,
         minClientVer: "",
         maxClientVer: "",
-        maxTimeDiff: 0,
+        maxTimediff: 0,
         shortIds: [$shortId],
         settings: {
           publicKey: "",
