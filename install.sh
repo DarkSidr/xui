@@ -314,7 +314,6 @@ https://${DOMAIN} {
         reverse_proxy 127.0.0.1:${PANEL_PORT} {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto https
         }
     }
@@ -371,6 +370,32 @@ login_panel() {
   die "Could not login to 3x-ui API."
 }
 
+delete_existing_reality_port_inbounds() {
+  local ids id http_code
+  ids="$(curl -sS \
+    -b "${COOKIE_FILE}" \
+    -H "X-Requested-With: XMLHttpRequest" \
+    "${XUI_API_BASE}/panel/api/inbounds/list" |
+    jq -r --argjson port "${REALITY_PORT}" '.obj[]? | select(.port == $port) | .id' 2>/dev/null || true)"
+
+  [[ -n "${ids}" ]] || return 0
+
+  while IFS= read -r id; do
+    [[ -n "${id}" ]] || continue
+    warn "Deleting existing 3x-ui inbound on port ${REALITY_PORT}, id=${id}"
+    http_code="$(curl -sS -o /tmp/xui-del-inbound.json -w "%{http_code}" \
+      -X POST \
+      -b "${COOKIE_FILE}" \
+      -H "X-Requested-With: XMLHttpRequest" \
+      -H "X-CSRF-Token: ${XUI_CSRF_TOKEN}" \
+      "${XUI_API_BASE}/panel/api/inbounds/del/${id}" || true)"
+    if [[ "${http_code}" != "200" ]] || ! jq -e '.success == true' /tmp/xui-del-inbound.json >/dev/null 2>&1; then
+      cat /tmp/xui-del-inbound.json >&2 || true
+      die "Could not delete existing inbound id=${id} on port ${REALITY_PORT}."
+    fi
+  done <<<"${ids}"
+}
+
 generate_reality_keys() {
   local xray_bin output
   xray_bin="$(find /usr/local/x-ui/bin -maxdepth 1 -type f -name 'xray-linux-*' | head -n 1)"
@@ -386,6 +411,7 @@ generate_reality_keys() {
 configure_reality_inbound() {
   log "Creating 3x-ui VLESS REALITY self-steal inbound"
   login_panel
+  delete_existing_reality_port_inbounds
   generate_reality_keys
 
   local settings stream sniffing http_code
