@@ -166,9 +166,16 @@ arch_name() {
 }
 
 install_3xui() {
-  local arch tmp
+  local arch tmp release service_installed
   arch="$(arch_name)"
   tmp="$(mktemp -d)"
+  release="unknown"
+  service_installed="false"
+  if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    release="${ID:-unknown}"
+  fi
+
   log "Installing latest 3x-ui release for ${arch}"
   wget -qO "${tmp}/x-ui.tar.gz" "https://github.com/MHSanaei/3x-ui/releases/latest/download/x-ui-linux-${arch}.tar.gz"
 
@@ -176,9 +183,54 @@ install_3xui() {
   rm -rf /usr/local/x-ui /usr/bin/x-ui "${tmp}/x-ui"
   tar zxf "${tmp}/x-ui.tar.gz" -C "${tmp}"
   chmod +x "${tmp}/x-ui/x-ui" "${tmp}/x-ui/x-ui.sh"
-  chmod +x "${tmp}"/x-ui/bin/xray-linux-* 2>/dev/null || true
+  find "${tmp}/x-ui/bin" -maxdepth 1 -type f -name 'xray-linux-*' -exec chmod +x {} \; 2>/dev/null || true
   cp "${tmp}/x-ui/x-ui.sh" /usr/bin/x-ui
-  cp -f "${tmp}/x-ui/x-ui.service" /etc/systemd/system/x-ui.service
+
+  if [[ -f "${tmp}/x-ui/x-ui.service" ]]; then
+    cp -f "${tmp}/x-ui/x-ui.service" /etc/systemd/system/x-ui.service
+    service_installed="true"
+  fi
+
+  if [[ "${service_installed}" == "false" ]]; then
+    case "${release}" in
+      ubuntu | debian | armbian)
+        if [[ -f "${tmp}/x-ui/x-ui.service.debian" ]]; then
+          cp -f "${tmp}/x-ui/x-ui.service.debian" /etc/systemd/system/x-ui.service
+          service_installed="true"
+        fi
+        ;;
+      arch | manjaro | parch)
+        if [[ -f "${tmp}/x-ui/x-ui.service.arch" ]]; then
+          cp -f "${tmp}/x-ui/x-ui.service.arch" /etc/systemd/system/x-ui.service
+          service_installed="true"
+        fi
+        ;;
+      *)
+        if [[ -f "${tmp}/x-ui/x-ui.service.rhel" ]]; then
+          cp -f "${tmp}/x-ui/x-ui.service.rhel" /etc/systemd/system/x-ui.service
+          service_installed="true"
+        fi
+        ;;
+    esac
+  fi
+
+  if [[ "${service_installed}" == "false" ]]; then
+    warn "Service file not found in 3x-ui archive; downloading systemd unit from upstream."
+    case "${release}" in
+      ubuntu | debian | armbian)
+        curl -4fLRo /etc/systemd/system/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.debian
+        ;;
+      arch | manjaro | parch)
+        curl -4fLRo /etc/systemd/system/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.arch
+        ;;
+      *)
+        curl -4fLRo /etc/systemd/system/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.rhel
+        ;;
+    esac
+  fi
+
+  chown root:root /etc/systemd/system/x-ui.service
+  chmod 644 /etc/systemd/system/x-ui.service
   mv "${tmp}/x-ui" /usr/local/x-ui
   systemctl daemon-reload
   systemctl enable x-ui
