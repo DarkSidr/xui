@@ -297,12 +297,6 @@ write_caddyfile() {
 
     servers 127.0.0.1:${CADDY_STEAL_PORT} {
         protocols h1 h2
-        listener_wrappers {
-            proxy_protocol {
-                allow 127.0.0.1/32
-            }
-            tls
-        }
     }
 }
 
@@ -412,7 +406,7 @@ configure_reality_inbound() {
       },
       realitySettings: {
         show: false,
-        xver: 1,
+        xver: 0,
         dest: $dest,
         serverNames: [$domain],
         privateKey: $privateKey,
