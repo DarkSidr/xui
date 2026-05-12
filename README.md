@@ -43,6 +43,8 @@ DOMAIN=example.com PANEL_PATH=SECRET_PATH bash <(wget -qO- https://raw.githubuse
 - Создает Caddyfile: сайт-заглушка на домене и reverse proxy панели на секретном пути.
 - Настраивает простой firewall через iptables: разрешены `22`, `80`, `443`.
 - Включает BBR.
+- Спрашивает, блокировать ли ICMP ping до сервера. По умолчанию `Y`.
+- Спрашивает, отключать ли IPv6. По умолчанию `Y`.
 - Печатает итоговый URL панели, логин/пароль и VLESS ссылку.
 
 ## Переменные
@@ -56,6 +58,8 @@ REALITY_PORT=443                 # публичный VLESS REALITY порт
 SSH_PORT=22                      # порт SSH, который оставить открытым
 INSTALL_FIREWALL=true            # true/false
 ENABLE_BBR=true                  # true/false
+BLOCK_ICMP_PING=true             # true/false, если задано - вопрос не задается
+DISABLE_IPV6=true                # true/false, если задано - вопрос не задается
 ```
 
 ## После установки

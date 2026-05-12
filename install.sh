@@ -15,6 +15,8 @@ REALITY_PORT="${REALITY_PORT:-443}"
 SSH_PORT="${SSH_PORT:-22}"
 INSTALL_FIREWALL="${INSTALL_FIREWALL:-true}"
 ENABLE_BBR="${ENABLE_BBR:-true}"
+BLOCK_ICMP_PING="${BLOCK_ICMP_PING:-}"
+DISABLE_IPV6="${DISABLE_IPV6:-}"
 
 red=$'\033[0;31m'
 green=$'\033[0;32m'
@@ -38,6 +40,31 @@ need_root() {
   [[ "${EUID}" -eq 0 ]] || die "Run this script as root."
 }
 
+ask_yes_no() {
+  local prompt default answer
+  prompt="$1"
+  default="$2"
+  while true; do
+    read -rp "${prompt} [Y/n]: " answer
+    answer="${answer:-${default}}"
+    case "${answer,,}" in
+      y | yes) return 0 ;;
+      n | no) return 1 ;;
+      *) echo "Please enter y or n." ;;
+    esac
+  done
+}
+
+normalize_bool() {
+  local value
+  value="${1,,}"
+  case "${value}" in
+    true | yes | y | 1) echo "true" ;;
+    false | no | n | 0) echo "false" ;;
+    *) die "Invalid boolean value: ${1}. Use y/n or true/false." ;;
+  esac
+}
+
 prompt_inputs() {
   if [[ -z "${DOMAIN}" ]]; then
     read -rp "Enter domain for camouflage site and panel, e.g. example.com: " DOMAIN
@@ -58,6 +85,28 @@ prompt_inputs() {
   PANEL_PATH="${PANEL_PATH%/}"
   [[ "${#PANEL_PATH}" -ge 8 ]] || die "PANEL_PATH must be at least 8 characters."
   [[ "${PANEL_PATH}" =~ ^[A-Za-z0-9._~-]+$ ]] || die "PANEL_PATH may contain only A-Z, a-z, 0-9, dot, underscore, tilde and dash."
+}
+
+prompt_security_options() {
+  if [[ -z "${BLOCK_ICMP_PING}" ]]; then
+    if ask_yes_no "Block ICMP ping to this server?" "y"; then
+      BLOCK_ICMP_PING="true"
+    else
+      BLOCK_ICMP_PING="false"
+    fi
+  else
+    BLOCK_ICMP_PING="$(normalize_bool "${BLOCK_ICMP_PING}")"
+  fi
+
+  if [[ -z "${DISABLE_IPV6}" ]]; then
+    if ask_yes_no "Disable IPv6 on this server?" "y"; then
+      DISABLE_IPV6="true"
+    else
+      DISABLE_IPV6="false"
+    fi
+  else
+    DISABLE_IPV6="$(normalize_bool "${DISABLE_IPV6}")"
+  fi
 }
 
 public_ipv4() {
@@ -354,14 +403,42 @@ configure_reality_inbound() {
   systemctl restart x-ui
 }
 
-enable_bbr() {
-  [[ "${ENABLE_BBR}" == "true" ]] || return 0
-  log "Enabling BBR"
-  modprobe tcp_bbr 2>/dev/null || true
-  cat >/etc/sysctl.d/99-3x-ui-selfsteal.conf <<'EOF'
+apply_sysctl_tuning() {
+  log "Applying kernel network tuning"
+  : >/etc/sysctl.d/99-3x-ui-selfsteal.conf
+
+  if [[ "${ENABLE_BBR}" == "true" ]]; then
+    modprobe tcp_bbr 2>/dev/null || true
+    cat >>/etc/sysctl.d/99-3x-ui-selfsteal.conf <<'EOF'
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 EOF
+  fi
+
+  if [[ "${BLOCK_ICMP_PING}" == "true" ]]; then
+    cat >>/etc/sysctl.d/99-3x-ui-selfsteal.conf <<'EOF'
+net.ipv4.icmp_echo_ignore_all = 1
+EOF
+  else
+    cat >>/etc/sysctl.d/99-3x-ui-selfsteal.conf <<'EOF'
+net.ipv4.icmp_echo_ignore_all = 0
+EOF
+  fi
+
+  if [[ "${DISABLE_IPV6}" == "true" ]]; then
+    cat >>/etc/sysctl.d/99-3x-ui-selfsteal.conf <<'EOF'
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+EOF
+  else
+    cat >>/etc/sysctl.d/99-3x-ui-selfsteal.conf <<'EOF'
+net.ipv6.conf.all.disable_ipv6 = 0
+net.ipv6.conf.default.disable_ipv6 = 0
+net.ipv6.conf.lo.disable_ipv6 = 0
+EOF
+  fi
+
   sysctl --system >/dev/null || true
 }
 
@@ -395,6 +472,8 @@ REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
 REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
 CLIENT_UUID=${CLIENT_UUID}
 SHORT_ID=${SHORT_ID}
+BLOCK_ICMP_PING=${BLOCK_ICMP_PING}
+DISABLE_IPV6=${DISABLE_IPV6}
 VLESS_LINK=${vless_link}
 EOF
   chmod 600 "${STATE_FILE}"
@@ -414,8 +493,9 @@ main() {
   need_root
   install_packages
   prompt_inputs
+  prompt_security_options
   check_dns
-  enable_bbr
+  apply_sysctl_tuning
   install_3xui
   configure_panel
   write_site
