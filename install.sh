@@ -310,6 +310,8 @@ https://${DOMAIN} {
     root * ${WWW_DIR}
     encode gzip zstd
 
+    redir /${PANEL_PATH} /${PANEL_PATH}/ permanent
+
     handle /${PANEL_PATH}* {
         reverse_proxy 127.0.0.1:${PANEL_PORT} {
             header_up Host {host}
@@ -551,7 +553,7 @@ write_result() {
   vless_link="vless://${CLIENT_UUID}@${DOMAIN}:${REALITY_PORT}?type=tcp&security=reality&pbk=${REALITY_PUBLIC_KEY}&fp=chrome&sni=${DOMAIN}&sid=${SHORT_ID}&spx=%2F&flow=xtls-rprx-vision#${DOMAIN}-selfsteal"
   cat >"${STATE_FILE}" <<EOF
 DOMAIN=${DOMAIN}
-PANEL_URL=https://${DOMAIN}/${PANEL_PATH}
+PANEL_URL=https://${DOMAIN}/${PANEL_PATH}/
 PANEL_USER=${XUI_USER}
 PANEL_PASSWORD=${XUI_PASSWORD}
 REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
@@ -567,7 +569,7 @@ EOF
   echo
   echo -e "${green}Installation complete${plain}"
   echo "Site:      https://${DOMAIN}/"
-  echo "Panel:     https://${DOMAIN}/${PANEL_PATH}"
+  echo "Panel:     https://${DOMAIN}/${PANEL_PATH}/"
   echo "User:      ${XUI_USER}"
   echo "Password:  ${XUI_PASSWORD}"
   echo "VLESS:     ${vless_link}"
