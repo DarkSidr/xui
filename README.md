@@ -37,6 +37,12 @@ DOMAIN=example.com PANEL_PATH=SECRET_PATH bash <(wget -qO- https://raw.githubuse
 DOMAIN=example.com PANEL_PATH=SECRET_PATH BLOCK_ICMP_PING=true DISABLE_IPV6=true bash <(wget -qO- https://raw.githubusercontent.com/DarkSidr/xui/main/install.sh)
 ```
 
+Только запрет ping и отключение IPv6 без установки 3x-ui/Caddy:
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/DarkSidr/xui/main/vps-hardening.sh)
+```
+
 ## Что делает скрипт
 
 - Проверяет, что запущен от root.
@@ -116,3 +122,12 @@ x-ui update
 - Если сломать Reality inbound на `443`, сайт-заглушка может перестать открываться, но панель на `8443` останется доступна.
 - Скрипт не отключает root SSH и не меняет SSH hardening, чтобы не закрыть доступ к VPS неожиданно.
 - Это заготовка для личной инфраструктуры. Используй только там, где у тебя есть право администрировать сервер и домен.
+
+## Отдельный VPS hardening
+
+`vps-hardening.sh` можно запускать отдельно на VPS, если нужен только минимальный сетевой hardening:
+
+- включает `net.ipv4.icmp_echo_ignore_all = 1`;
+- отключает IPv6 через `net.ipv6.conf.*.disable_ipv6 = 1`;
+- добавляет runtime-правило `iptables` для drop IPv4 ICMP echo-request, если `iptables` установлен;
+- сохраняет sysctl-настройки в `/etc/sysctl.d/99-vps-hardening.conf`.
